@@ -1,6 +1,7 @@
 ﻿using IpInfoProvider.Models;
 using IPInformation.Api.Models;
 using Microsoft.Extensions.Caching.Memory;
+using System;
 using System.Collections.Generic;
 
 namespace IPInformation.Api.Services
@@ -10,6 +11,7 @@ namespace IPInformation.Api.Services
         IPDetails FetchFromMemory(string ip);
         void InsertToMemory(IPDetails details, string ip);
         IEnumerable<IPDetails> GetMemory(IEnumerable<string> keys);
+        void LoadIpsToMemory(UpdateIpDetails update);
     }
     public class MemoryCacheService : IMemoryCacheService
     {
@@ -47,6 +49,34 @@ namespace IPInformation.Api.Services
         public void InsertToMemory(IPDetails details, string ip)
         {
             _cache.Set(ip, details);
+        }
+
+        /// <summary>
+        /// This method will load all ips to memory
+        /// in order to update the ipdetails and keep track
+        /// of the progress
+        /// </summary>
+        /// <param name="ips"></param>
+        public void LoadIpsToMemory(UpdateIpDetails update)
+        {
+            if (_cache.Get("IpUpdate") == null)
+            {
+
+            }
+            _cache.Set("IpUpdate", update);
+        }
+
+        public string GetProgessOfUpdate(Guid id)
+        {
+            if (_cache.TryGetValue("IpUpdate",out UpdateIpDetails update))
+            {   /// An update may be on progress but wrong id was given
+                if(update.Id == id)
+                {
+                    return $"Currently completed: {update.Completed}/{update.Total}";
+                }
+            }
+
+            return null;
         }
     }
 }

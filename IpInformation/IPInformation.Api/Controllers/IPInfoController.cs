@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using IpInfoProvider.Models;
 using IpInfoProvider.Services;
+using IPInformation.Api.Models;
 using IPInformation.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,7 +49,7 @@ namespace IPInformation.Api.Controllers
                 /// and adds it to memory
                 /// </summary>
 
-                result = await _iPService.GetIPDetails(ip);
+                result = await _iPService.GetIpDetailsFromDb(ip);
 
                 if (result != null)
                 {
@@ -110,11 +112,19 @@ namespace IPInformation.Api.Controllers
         {
             try
             {
-                var keys = _iPService.GetAllIps();
+                /// Get all the ips from DB for the update
+                HashSet<string> ips = _iPService.GetAllIps();
 
-                var result = _memory.GetMemory(keys);
+                /// Create the object that will be stored in memory and keep the 
+                /// progress status
+                UpdateIpDetails update = _iPService.CreateObjectForUpdate(ips);
 
-                return Ok(result);
+                /// Load the object to the memory
+                _memory.LoadIpsToMemory(update);
+
+                /// Start the update method and return the Id to the user
+
+                return Ok(update.Id);
 
             }
             catch (Exception exc)
@@ -124,10 +134,12 @@ namespace IPInformation.Api.Controllers
         }
 
         [HttpGet("check/update/progress/{jobId}")]
-        public IActionResult UpdateAllInfo(string jobId)
+        public IActionResult GetProgessOfUpdate(string jobId)
         {
             try
             {
+
+
                 return Ok();
 
             }
