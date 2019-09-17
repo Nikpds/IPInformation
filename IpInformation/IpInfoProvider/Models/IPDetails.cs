@@ -1,4 +1,4 @@
-﻿namespace IpInfoProvider
+﻿namespace IpInfoProvider.Models
 {
     public class IPDetails
     {
