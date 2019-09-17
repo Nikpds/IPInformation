@@ -16,8 +16,8 @@ namespace IPInformation.Api.DataContext
             var ipBuilder = modelBuilder.Entity<IPDetailsExtended>();
 
             ipBuilder.HasKey(h => h.Id);
-
-            //ipBuilder.HasIndex(i => i.Ip);
+            ipBuilder.Property(h => h.Ip).IsRequired();
+            ipBuilder.HasIndex(i => i.Ip).IsUnique();
 
         }
     }

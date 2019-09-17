@@ -104,5 +104,37 @@ namespace IPInformation.Api.Controllers
                 return BadRequest("An Error was occured, " + exc.Message);
             }
         }
+
+        [HttpGet("update/all/info")]
+        public IActionResult UpdateAllInfo()
+        {
+            try
+            {
+                var keys = _iPService.GetAllIps();
+
+                var result = _memory.GetMemory(keys);
+
+                return Ok(result);
+
+            }
+            catch (Exception exc)
+            {
+                return BadRequest("An Error was occured, " + exc.Message);
+            }
+        }
+
+        [HttpGet("check/update/progress/{jobId}")]
+        public IActionResult UpdateAllInfo(string jobId)
+        {
+            try
+            {
+                return Ok();
+
+            }
+            catch (Exception exc)
+            {
+                return BadRequest("An Error was occured, " + exc.Message);
+            }
+        }
     }
 }

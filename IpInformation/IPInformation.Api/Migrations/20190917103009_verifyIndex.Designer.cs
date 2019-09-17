@@ -4,14 +4,16 @@ using IPInformation.Api.DataContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace IPInformation.Api.Migrations
 {
     [DbContext(typeof(SqlDbContext))]
-    partial class SqlDbContextModelSnapshot : ModelSnapshot
+    [Migration("20190917103009_verifyIndex")]
+    partial class verifyIndex
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -26,14 +28,13 @@ namespace IPInformation.Api.Migrations
 
                     b.Property<string>("City");
 
-                    b.Property<string>("Continent_name");
+                    b.Property<string>("Continent");
 
-                    b.Property<string>("Country_name");
+                    b.Property<string>("Country");
 
                     b.Property<DateTime>("Created");
 
-                    b.Property<string>("Ip")
-                        .IsRequired();
+                    b.Property<string>("Ip");
 
                     b.Property<double>("Latitude");
 
@@ -41,8 +42,7 @@ namespace IPInformation.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Ip")
-                        .IsUnique();
+                    b.HasIndex("Ip");
 
                     b.ToTable("IPDetails");
                 });

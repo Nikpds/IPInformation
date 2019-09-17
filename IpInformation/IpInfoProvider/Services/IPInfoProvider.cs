@@ -8,8 +8,8 @@ namespace IpInfoProvider.Services
 {
     public class IPInfoProvider : IIPInfoProvider
     {
-        private readonly string _url ;
-        private readonly string _key ;
+        private readonly string _url;
+        private readonly string _key;
         public IPInfoProvider()
         {
             var config = new ConfigurationBuilder()
@@ -24,21 +24,34 @@ namespace IpInfoProvider.Services
             try
             {
                 string url = $"{_url}/{ip}?access_key={_key}";
-
-                using (HttpClient client = new HttpClient())
+                HttpClient client = new HttpClient();
+                HttpResponseMessage res = await client.GetAsync(url);
+                HttpContent content = res.Content;
+                string data = await content.ReadAsStringAsync();
+                if (data != null)
                 {
-                    using (HttpResponseMessage res = await client.GetAsync(url))
+                    var result = JsonConvert.DeserializeObject<ErrorResponse>(data);
+                    if (!result.Success && result.Error != null)
                     {
-                        using (HttpContent content = res.Content)
-                        {
-                            string data = await content.ReadAsStringAsync();
-                            if (data != null)
-                            {
-                                return JsonConvert.DeserializeObject<IPDetails>(data);
-                            }
-                        }
+                        return null;
                     }
+                    return JsonConvert.DeserializeObject<IPDetails>(data);
+
                 }
+                //using (HttpClient client = new HttpClient())
+                //{
+                //    using (HttpResponseMessage res = await client.GetAsync(url))
+                //    {
+                //        using (HttpContent content = res.Content)
+                //        {
+                //            string data = await content.ReadAsStringAsync();
+                //            if (data != null)
+                //            {
+                //                return JsonConvert.DeserializeObject<IPDetails>(data);
+                //            }
+                //        }
+                //    }
+                //}
 
                 return null;
             }

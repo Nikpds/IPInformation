@@ -16,12 +16,26 @@ namespace IPInformation.Api.Models
         public IPDetailsExtended(IPDetails details, string ip)
         {
             Ip = ip;
-            Created = DateTime.UtcNow;            
+            Created = DateTime.UtcNow;
             Latitude = details.Latitude;
             Longitude = details.Longitude;
-            Continent = details.Continent;
-            Country = details.Country;
+            Continent_name = details.Continent_name;
+            Country_name = details.Country_name;
             City = details.City;
+        }
+
+        public static IPDetails DomainToView(IPDetailsExtended details)
+        {
+            if (details == null) { return null; }
+
+            return new IPDetails()
+            {
+                Latitude = details.Latitude,
+                Longitude = details.Longitude,
+                Continent_name = details.Continent_name,
+                Country_name = details.Country_name,
+                City = details.City,
+            };
         }
     }
 }

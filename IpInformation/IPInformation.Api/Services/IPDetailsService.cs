@@ -41,7 +41,7 @@ namespace IPInformation.Api.Services
                 var details = await _ctx.IPDetails.FirstOrDefaultAsync(x => x.Ip == ip)
                                                   .ConfigureAwait(false);
 
-                return details;
+                return IPDetailsExtended.DomainToView(details);
             }
         }
 

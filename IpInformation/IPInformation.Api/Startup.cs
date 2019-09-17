@@ -30,6 +30,8 @@ namespace IPInformation.Api
             services.AddSingleton<IMemoryCacheService, MemoryCacheService>();
             services.AddScoped<IIPDetailsService, IPDetailsService>();
 
+            services.AddMemoryCache();
+
             services.AddCors();
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
