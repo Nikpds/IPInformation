@@ -2,6 +2,7 @@
 {
     public class IPDetails
     {
+        public string Ip { get; set; }
         public string City { get; set; }
         public string Country_name { get; set; }
         public string Continent_name { get; set; }

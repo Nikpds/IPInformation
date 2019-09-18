@@ -108,7 +108,7 @@ namespace IPInformation.Api.Controllers
         }
 
         [HttpGet("update/all/info")]
-        public IActionResult UpdateAllInfo()
+        public async Task<IActionResult> UpdateAllInfo()
         {
             try
             {
@@ -120,9 +120,15 @@ namespace IPInformation.Api.Controllers
                 UpdateIpDetails update = _iPService.CreateObjectForUpdate(ips);
 
                 /// Load the object to the memory
-                _memory.LoadIpsToMemory(update);
+                bool clearOfOtherProcess = _memory.LoadIpsToMemory(update);
+
+                if (!clearOfOtherProcess)
+                {
+                    return BadRequest("Another process is running! Please try again later.");
+                }
 
                 /// Start the update method and return the Id to the user
+                await _iPService.StartUpdatingIps(update);
 
                 return Ok(update.Id);
 
@@ -138,9 +144,9 @@ namespace IPInformation.Api.Controllers
         {
             try
             {
+                var progress = _memory.GetProgessOfUpdate(jobId);
 
-
-                return Ok();
+                return Ok(progress);
 
             }
             catch (Exception exc)

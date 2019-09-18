@@ -4,9 +4,9 @@ namespace IPInformation.Api.Models
 {
     public class IPDetailsExtended : IPDetails
     {
-        public string Ip { get; set; }
         public string Id { get; set; }
         public DateTime Created { get; set; }
+        public DateTime Updated { get; set; }
 
         public IPDetailsExtended()
         {

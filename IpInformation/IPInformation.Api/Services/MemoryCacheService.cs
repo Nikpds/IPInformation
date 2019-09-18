@@ -11,11 +11,12 @@ namespace IPInformation.Api.Services
         IPDetails FetchFromMemory(string ip);
         void InsertToMemory(IPDetails details, string ip);
         IEnumerable<IPDetails> GetMemory(IEnumerable<string> keys);
-        void LoadIpsToMemory(UpdateIpDetails update);
+        bool LoadIpsToMemory(UpdateIpDetails update);
+        string GetProgessOfUpdate(string id);
     }
     public class MemoryCacheService : IMemoryCacheService
     {
-        private IMemoryCache _cache;
+        private readonly IMemoryCache _cache;
 
         public MemoryCacheService(IMemoryCache cache)
         {
@@ -54,23 +55,28 @@ namespace IPInformation.Api.Services
         /// <summary>
         /// This method will load all ips to memory
         /// in order to update the ipdetails and keep track
-        /// of the progress
+        /// of the progress. If its not null then another process is 
+        /// on and will be skiped
         /// </summary>
         /// <param name="ips"></param>
-        public void LoadIpsToMemory(UpdateIpDetails update)
+        public bool LoadIpsToMemory(UpdateIpDetails update)
         {
             if (_cache.Get("IpUpdate") == null)
             {
+                _cache.Set("IpUpdate", update);
 
+                return true;
             }
-            _cache.Set("IpUpdate", update);
+
+            return false;
+
         }
 
-        public string GetProgessOfUpdate(Guid id)
+        public string GetProgessOfUpdate(string id)
         {
-            if (_cache.TryGetValue("IpUpdate",out UpdateIpDetails update))
+            if (_cache.TryGetValue("IpUpdate", out UpdateIpDetails update))
             {   /// An update may be on progress but wrong id was given
-                if(update.Id == id)
+                if (update.Id == id)
                 {
                     return $"Currently completed: {update.Completed}/{update.Total}";
                 }
