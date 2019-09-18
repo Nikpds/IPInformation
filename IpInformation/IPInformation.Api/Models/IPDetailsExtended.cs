@@ -30,6 +30,7 @@ namespace IPInformation.Api.Models
 
             return new IPDetails()
             {
+                Ip = details.Ip,
                 Latitude = details.Latitude,
                 Longitude = details.Longitude,
                 Continent_name = details.Continent_name,

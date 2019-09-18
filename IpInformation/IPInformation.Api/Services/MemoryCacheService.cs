@@ -9,10 +9,12 @@ namespace IPInformation.Api.Services
     public interface IMemoryCacheService
     {
         IPDetails FetchFromMemory(string ip);
-        void InsertToMemory(IPDetails details, string ip);
+        void InsertToMemory(string ip, object key);
         IEnumerable<IPDetails> GetMemory(IEnumerable<string> keys);
         bool LoadIpsToMemory(UpdateIpDetails update);
         string GetProgessOfUpdate(string id);
+
+        void RemoveItem(string key);
     }
     public class MemoryCacheService : IMemoryCacheService
     {
@@ -47,9 +49,9 @@ namespace IPInformation.Api.Services
             return memoryItems;
         }
 
-        public void InsertToMemory(IPDetails details, string ip)
+        public void InsertToMemory(string ip, object key)
         {
-            _cache.Set(ip, details);
+            _cache.Set(ip, key);
         }
 
         /// <summary>
@@ -82,7 +84,12 @@ namespace IPInformation.Api.Services
                 }
             }
 
-            return null;
+            return "No Such process";
+        }
+
+        public void RemoveItem(string key)
+        {
+            _cache.Remove(key);
         }
     }
 }

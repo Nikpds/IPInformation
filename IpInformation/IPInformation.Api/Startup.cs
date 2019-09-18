@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Swashbuckle.AspNetCore.Swagger;
+using System.Net.Http;
 
 namespace IPInformation.Api
 {
@@ -25,11 +26,20 @@ namespace IPInformation.Api
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<SqlDbContext>(options =>
-                   options.UseSqlServer(Configuration["ConnectionStrings:defaultConnection"]));
+                   options.UseSqlServer(Configuration["ConnectionStrings:DefaultConnection"]));
 
-            services.AddTransient<IIPInfoProvider, IPInfoProvider>();
-            services.AddSingleton<IMemoryCacheService, MemoryCacheService>();
+           
             services.AddScoped<IIPDetailsService, IPDetailsService>();
+            services.AddScoped<IMemoryCacheService, MemoryCacheService>();
+
+            services.AddHttpClient();
+
+            services.AddScoped<IIPInfoProvider, IPInfoProvider>(options =>
+            {
+                var httpClientFactory = options.GetRequiredService<IHttpClientFactory>();
+                return new IPInfoProvider(httpClientFactory.CreateClient(), Configuration["IpStack:IpStackUrl"], Configuration["IpStack:PublicKey"]);
+            });
+
 
             services.AddMemoryCache();
 

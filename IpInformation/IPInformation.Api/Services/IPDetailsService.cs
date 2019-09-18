@@ -13,25 +13,25 @@ namespace IPInformation.Api.Services
 {
     public interface IIPDetailsService
     {
-        Task<IPDetails> InsertIPDetails(IPDetails details, string ip);
-        Task<IPDetails> GetIpDetailsFromDb(string ip);
-        HashSet<string> GetAllIps();
-        UpdateIpDetails CreateObjectForUpdate(HashSet<string> ips);
-        Task StartUpdatingIps(UpdateIpDetails update);
+        Task<IPDetails> FetchIpDetails(string ip);
+        IEnumerable<IPDetails> GetMemoryCache();
+        string GetProgessOfUpdate(string jobId);
+        UpdateIpDetails InitiateUpdateInformation();
+        void UpdateAllInfo(UpdateIpDetails update);
     }
     public class IPDetailsService : IIPDetailsService
     {
         private readonly SqlDbContext _ctx;
         private readonly IIPInfoProvider _ipInfoProvider;
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCacheService _memory;
         public IPDetailsService(
             SqlDbContext ctx,
             IIPInfoProvider ipInfoProvider,
-            IMemoryCache cache
+            IMemoryCacheService memory
             )
         {
             _ctx = ctx;
-            _cache = cache;
+            _memory = memory;
             _ipInfoProvider = ipInfoProvider;
         }
 
@@ -43,65 +43,110 @@ namespace IPInformation.Api.Services
         /// </summary>
         /// <param name="ips"></param>
         /// <returns>An object with the guid for the user to use</returns>
-        public UpdateIpDetails CreateObjectForUpdate(HashSet<string> ips)
+
+        public async Task<IPDetails> FetchIpDetails(string ip)
         {
-            UpdateIpDetails update = new UpdateIpDetails
+            IPDetails result;
+
+            /// <summary>
+            /// Returns data from memory if exists
+            /// </summary>
+            result = _memory.FetchFromMemory(ip);
+
+            if (result != null)
             {
-                Ips = ips,
-                Total = ips.Count(),
-                Id = Guid.NewGuid().ToString(),
-                Completed = 0
-            };
+                return result;
+            }
+
+            /// <summary>
+            /// Returns data from database if exists
+            /// and adds it to memory
+            /// </summary>
+            var domainDetails = await _ctx.IPDetails.FirstOrDefaultAsync(x => x.Ip == ip)
+                                                    .ConfigureAwait(false);
+            var details = IPDetailsExtended.DomainToView(domainDetails);
+            if (details != null)
+            {
+                _memory.InsertToMemory(ip, details);
+
+                return details;
+            }
+
+            /// <summary>
+            /// Gets ip info from the library
+            /// If it is not null we add it to db and to memory 
+            /// and finally we return the value
+            /// </summary>
+
+            result = await _ipInfoProvider.GetDetails(ip).ConfigureAwait(false);
+
+            if (result != null)
+            {
+                _memory.InsertToMemory(ip, result);
+
+                await InsertIPDetails(result, ip).ConfigureAwait(false);
+
+                return result;
+            }
+
+            return result;
+        }
+
+        public IEnumerable<IPDetails> GetMemoryCache()
+        {
+            var keys = _ctx.IPDetails.Select(x => x.Ip).ToHashSet();
+
+            var result = _memory.GetMemory(keys);
+
+            return result;
+        }
+
+        public string GetProgessOfUpdate(string jobId)
+        {
+            return _memory.GetProgessOfUpdate(jobId);
+        }
+
+        public UpdateIpDetails InitiateUpdateInformation()
+        {
+            /// Get all the ips from DB for the update
+            HashSet<string> ips = _ctx.IPDetails.Select(x => x.Ip).ToHashSet();
+
+            /// Create the object that will be stored in memory and keep the 
+            /// progress status
+            UpdateIpDetails update = CreateObjectForUpdate(ips);
+
+            /// Load the object to the memory
+            bool clearOfOtherProcess = _memory.LoadIpsToMemory(update);
+
+            if (!clearOfOtherProcess)
+            {
+                //  return "Another process is running! Please try again later.";
+            }
 
             return update;
         }
 
-        public HashSet<string> GetAllIps()
+        public void UpdateAllInfo(UpdateIpDetails update)
         {
-            var ips = _ctx.IPDetails.Select(x => x.Ip).ToHashSet();
-
-            return ips;
+            /// Start the update method and return the Id to the user
+            Task.Run(() => StartUpdatingIps(update));
         }
 
-        public async Task<IPDetails> GetIpDetailsFromDb(string ip)
+        private async Task InsertIPDetails(IPDetails details, string ip)
         {
-            if (string.IsNullOrEmpty(ip))
-            {
-                throw new Exception("Invalid ip");
-            }
-            else
-            {
-                var details = await _ctx.IPDetails.FirstOrDefaultAsync(x => x.Ip == ip)
-                                                  .ConfigureAwait(false);
+            IPDetailsExtended model = new IPDetailsExtended(details, ip);
 
-                return IPDetailsExtended.DomainToView(details);
-            }
+            await _ctx.IPDetails.AddAsync(model).ConfigureAwait(false);
+
+            await _ctx.SaveChangesAsync();
         }
 
-        public async Task<IPDetails> InsertIPDetails(IPDetails details, string ip)
-        {
-            if (details == null)
-            {
-                throw new Exception("Invalid details");
-            }
-            else
-            {
-                IPDetailsExtended model = new IPDetailsExtended(details, ip);
-
-                await _ctx.IPDetails.AddAsync(model).ConfigureAwait(false);
-
-                await _ctx.SaveChangesAsync();
-
-                return details;
-            }
-        }
-
-        public async Task StartUpdatingIps(UpdateIpDetails update)
+        private async Task StartUpdatingIps(UpdateIpDetails update)
         {
             /// End the process
             if (update.Ips.Count() == 0)
             {
-                _cache.Remove("IpUpdate");
+                _memory.RemoveItem("Update");
                 return;
             }
 
@@ -119,42 +164,74 @@ namespace IPInformation.Api.Services
 
                 update.Completed += 10;
 
-                _cache.Set("IpUpdate", update);
+                _memory.InsertToMemory("IpUpdate", update);
 
-                await StartUpdatingIps(update);
+                await StartUpdatingIps(update).ConfigureAwait(false);
+
+                return;
             }
 
             /// Take the last items and finish
-            result = await _ipInfoProvider.GetDetailsForMany(update.Ips);
+            result = await _ipInfoProvider.GetDetailsForMany(update.Ips).ConfigureAwait(false);
 
             UpdateMultipleIps(result, update.Ips);
 
-            _cache.Remove("IpUpdate");
+            _memory.RemoveItem("Update");
         }
 
-        private void UpdateMultipleIps(List<IPDetails> details, HashSet<string> ips)
+
+        /// <summary>
+        /// THIS WILL NOT WORK
+        /// AN IMPLEMENTATION OF BACKGROUND HOST SERVICES 
+        /// SHOULD BE IMPLEMENTED OR USE OF A LIBRARY SUCH AS
+        /// HANGFIRE. IN ORDER TO AVOID DELAYING THE PROJECT 
+        /// I WILL SEND IT WITH THIS VARIATION
+        /// </summary>
+        /// <param name="details"></param>
+        /// <param name="ips"></param>
+        private async void UpdateMultipleIps(List<IPDetails> details, HashSet<string> ips)
         {
-            if(details == null)
+            if (details == null)
             {
                 throw new Exception("Something went wrong");
             }
-            var originals = _ctx.IPDetails.Where(x => ips.Equals(x.Ip)).ToList();
-            originals.ForEach(o =>
+            try
             {
-                var newDetails = details.Find(f => f.Ip == o.Ip);
 
-                o.Updated = DateTime.UtcNow;
-                o.Latitude = newDetails.Latitude;
-                o.Longitude = newDetails.Longitude;
-                o.Continent_name = newDetails.Continent_name;
-                o.Country_name = newDetails.Country_name;
-                o.City = newDetails.City;
-            });
+                var originals = await _ctx.IPDetails.Where(x => ips.Contains(x.Ip)).ToListAsync();
+                originals.ForEach(o =>
+                {
+                    var newDetails = details.Find(f => f.Ip == o.Ip);
 
-            System.Threading.Thread.Sleep(3000);
-            _ctx.UpdateRange(originals);
+                    o.Updated = DateTime.UtcNow;
+                    o.Latitude = newDetails.Latitude;
+                    o.Longitude = newDetails.Longitude;
+                    o.Continent_name = newDetails.Continent_name;
+                    o.Country_name = newDetails.Country_name;
+                    o.City = newDetails.City;
+                });
+                                
+                _ctx.UpdateRange(originals);
 
-            _ctx.SaveChanges();
+                _ctx.SaveChanges();
+            }
+            catch (Exception ex)
+            {
+                var temp = ex;
+            }
+        }
+
+        private UpdateIpDetails CreateObjectForUpdate(HashSet<string> ips)
+        {
+            UpdateIpDetails update = new UpdateIpDetails
+            {
+                Ips = ips,
+                Total = ips.Count(),
+                Id = Guid.NewGuid().ToString(),
+                Completed = 0
+            };
+
+            return update;
         }
     }
 }

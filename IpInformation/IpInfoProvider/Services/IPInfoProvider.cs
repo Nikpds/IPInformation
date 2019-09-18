@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using IpInfoProvider.Models;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 
 namespace IpInfoProvider.Services
@@ -12,14 +12,12 @@ namespace IpInfoProvider.Services
     {
         private readonly string _url;
         private readonly string _key;
-        public IPInfoProvider()
+        private readonly HttpClient _client;
+        public IPInfoProvider(HttpClient client, string url, string key)
         {
-            var config = new ConfigurationBuilder()
-                                .AddJsonFile("appsettings.json")
-                                .Build();
-
-            _url = config["ipStackUrl"];
-            _key = config["publicKey"];
+            _client = client;
+            _url = url;
+            _key = key;
         }
         public async Task<IPDetails> GetDetails(string ip)
         {
@@ -27,22 +25,7 @@ namespace IpInfoProvider.Services
             {
                 string url = $"{_url}/{ip}?access_key={_key}";
 
-                using (HttpClient client = new HttpClient())
-                {
-                    using (HttpResponseMessage res = await client.GetAsync(url))
-                    {
-                        using (HttpContent content = res.Content)
-                        {
-                            string data = await content.ReadAsStringAsync();
-                            if (data != null)
-                            {
-                                return JsonConvert.DeserializeObject<IPDetails>(data);
-                            }
-                        }
-                    }
-                }
-
-                return null;
+                return await CallForDetails(url);
             }
             catch (IPServiceNotAvailableException exc)
             {
@@ -63,22 +46,18 @@ namespace IpInfoProvider.Services
             string url = $"{_url}/{urlIps}?access_key={_key}";
             try
             {
-                using (HttpClient client = new HttpClient())
+                var response = await _client.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
                 {
-                    using (HttpResponseMessage res = await client.GetAsync(url))
+                    var data = await response.Content.ReadAsStringAsync();
+                    if (data != null)
                     {
-                        using (HttpContent content = res.Content)
-                        {
-                            string data = await content.ReadAsStringAsync();
-                            var result = JsonConvert.DeserializeObject<ErrorResponse>(data);
-                            if (!result.Success && result.Error != null)
-                            {
-                                return null;
-                            }
-                            return JsonConvert.DeserializeObject<List<IPDetails>>(data);
-                        }
+                        return JsonConvert.DeserializeObject<List<IPDetails>>(data);
                     }
                 }
+
+                return null;
             }
             catch (IPServiceNotAvailableException exc)
             {
@@ -88,31 +67,41 @@ namespace IpInfoProvider.Services
 
         public async Task<List<IPDetails>> GetDetailsForMany(HashSet<string> ips)
         {
-            string urlIps = String.Join(',', ips);
-            string url = $"{_url}/{urlIps}?access_key={_key}";
+            List<IPDetails> details = new List<IPDetails>();
+            var ipList = ips.ToList();
             try
             {
-                using (HttpClient client = new HttpClient())
+                for (var i = 0; i < ipList.Count(); i++)
                 {
-                    using (HttpResponseMessage res = await client.GetAsync(url))
+                    string url = $"{_url}/{ipList[i]}?access_key={_key}";
+                    var response = await CallForDetails(url);
+                    if (response != null)
                     {
-                        using (HttpContent content = res.Content)
-                        {
-                            string data = await content.ReadAsStringAsync();
-                            var result = JsonConvert.DeserializeObject<ErrorResponse>(data);
-                            if (!result.Success && result.Error != null)
-                            {
-                                return null;
-                            }
-                            return JsonConvert.DeserializeObject<List<IPDetails>>(data);
-                        }
+                        details.Add(response);
                     }
                 }
+
+                return details;
             }
             catch (IPServiceNotAvailableException exc)
             {
                 throw exc;
             }
+        }
+
+        private async Task<IPDetails> CallForDetails(string url)
+        {
+            var response = await _client.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var data = await response.Content.ReadAsStringAsync();
+                if (data != null)
+                {
+                    return JsonConvert.DeserializeObject<IPDetails>(data);
+                }
+            }
+            return null;
         }
     }
 }
